@@ -1,14 +1,17 @@
 # Builds and publishes the map to GitHub Pages.
 # Map tiles, photos and landmark data are pulled from gtadb's GitHub repo at build
 # time (as they ask: no live requests to gtadb.org), so this repo stays small.
-# Runs on every push to main, weekly to pick up new landmarks, and on demand.
+#
+# Runs on every push to main, on demand, and every 3 hours. Scheduled runs only
+# rebuild when gtadb has published new commits since the last deploy, so new
+# landmarks and photos show up on the site within a few hours.
 name: Deploy to GitHub Pages
 
 on:
   push:
     branches: [main]
   schedule:
-    - cron: "0 6 * * 1"
+    - cron: "17 */3 * * *"
   workflow_dispatch:
 
 permissions:
@@ -18,10 +21,31 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.cmp.outputs.changed }}
+    steps:
+      - id: cmp
+        name: Has gtadb changed since the last deploy?
+        run: |
+          upstream=$(git ls-remote https://github.com/rolux/gtadb.org.git HEAD | cut -f1)
+          # -L follows the redirect if a custom domain is added later
+          deployed=$(curl -fsSL "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/gtadb-version.json" 2>/dev/null | grep -o '[0-9a-f]\{40\}' || true)
+          echo "upstream=$upstream deployed=${deployed:-none}"
+          if [ "${{ github.event_name }}" != "schedule" ] || [ "$upstream" != "$deployed" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "gtadb unchanged, skipping deploy"
+          fi
+
   deploy:
+    needs: check
+    if: needs.check.outputs.changed == 'true'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -33,6 +57,10 @@ jobs:
         run: |
           git clone --depth 1 --filter=blob:none --sparse https://github.com/rolux/gtadb.org.git vendor/gtadb
           git -C vendor/gtadb sparse-checkout set maps/tiles/6/day map/data/6 map/photos/6
+          sha=$(git -C vendor/gtadb rev-parse HEAD)
+          date=$(git -C vendor/gtadb log -1 --format=%cI)
+          echo "{\"sha\":\"$sha\",\"date\":\"$date\"}" > gtadb-version.json
+          cat gtadb-version.json
           rm -rf vendor/gtadb/.git
           touch .nojekyll
           du -sh vendor/gtadb

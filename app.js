@@ -63,9 +63,12 @@
   const HIDDEN_TAG = t => /^l\d$/.test(t) || t.startsWith("//") || t.startsWith("@");
   const catIcon = c => c.kind === "pin" ? c.id : "building";
 
+  // Written by the deploy workflow: which gtadb commit this build uses (absent when running locally).
+  const version = await fetch("gtadb-version.json", { cache: "no-cache" }).then(r => r.ok ? r.json() : null).catch(() => null);
+
   let raw;
   try {
-    raw = await (await fetch("vendor/gtadb/map/data/6/landmarks.json")).json();
+    raw = await (await fetch(`vendor/gtadb/map/data/6/landmarks.json${version ? "?v=" + version.sha.slice(0, 10) : ""}`)).json();
   } catch {
     $("#loading").textContent = "Couldn't load landmark data. Run the site through a web server.";
     return;
@@ -73,7 +76,7 @@
 
   const landmarks = [];
   for (const [id, v] of Object.entries(raw)) {
-    const [ig, pos, igPhoto, rl, latlng, rlPhoto, tags = []] = v;
+    const [ig, pos, igPhoto, rl, latlng, rlPhoto, tags = [], , edited = []] = v;
     if (pos?.length !== 2) continue; // not placed on the map yet
     const cat = CATS.find(c => c.tags.some(t => tags.includes(t)))?.id ?? "other";
     const [first, ...rest] = (ig || "?").split(", ");
@@ -86,12 +89,18 @@
       status: tags.filter(t => STATUS_IDS.has(t)),
       enterable: tags.includes("enterable"),
       photos: [igPhoto?.length === 2 && "ig", rlPhoto?.length === 2 && "rl"].filter(Boolean),
+      size: { ig: igPhoto?.length === 2 ? igPhoto : null, rl: rlPhoto?.length === 2 ? rlPhoto : null },
+      ver: { ig: edited[1], rl: edited[2] }, // gtadb bumps these when a photo is replaced
     };
     l.search = `${l.name} ${l.area} ${rl ?? ""} ${id} ${catById[cat].name} ${l.tags.join(" ")}`.toLowerCase();
     landmarks.push(l);
   }
   const byId = Object.fromEntries(landmarks.map(l => [l.id, l]));
-  const photoUrl = (id, kind) => `vendor/gtadb/map/photos/6/${id},${kind}.jpg`;
+  // ?v= changes whenever gtadb replaces a photo, so browsers never show a stale copy
+  const photoUrl = (id, kind) => {
+    const v = byId[id]?.ver[kind];
+    return `vendor/gtadb/map/photos/6/${id},${kind}.jpg${v ? "?v=" + v : ""}`;
+  };
 
   // ---------- community backend (Supabase REST, no SDK) ----------
   const { supabaseUrl: SB_URL, supabaseAnonKey: SB_KEY } = window.CONFIG || {};
@@ -354,29 +363,55 @@
   // ---------- photo comparison ----------
   const cmp = $("#compare");
   const cbody = cmp.querySelector(".cbody");
+  // Many in-game shots are small trailer crops, so never blow a photo up past 1.5x its real size.
+  const MAX_UP = 1.5;
+  let comparing = null;
+  function layoutCompare() {
+    const l = comparing; if (!l || cmp.hidden) return;
+    for (const k of ["ig", "rl"]) {
+      const img = cmp.querySelector(k === "ig" ? ".cig img" : ".crl img"), s = l.size[k];
+      img.style.maxWidth = s ? s[0] * MAX_UP + "px" : "";
+      img.style.maxHeight = s ? s[1] * MAX_UP + "px" : "";
+    }
+    // slider: a stage shaped like the in-game shot (it's the smaller one), fitted to the screen
+    const s = l.size.ig || l.size.rl;
+    const scale = Math.min(cbody.clientWidth / s[0], cbody.clientHeight / s[1], MAX_UP);
+    cbody.style.setProperty("--sw", s[0] * scale + "px");
+    cbody.style.setProperty("--sh", s[1] * scale + "px");
+  }
+  function setSliderPos(v) {
+    cmp.querySelector(".cslider").value = v;
+    cbody.style.setProperty("--pos", v + "%");
+    cbody.style.setProperty("--p", v / 100);
+  }
   function openCompare(l, mode = "side") {
     if (!l?.photos?.length) return;
+    comparing = l;
     const both = l.photos.length === 2;
     cmp.querySelector(".ctitle").innerHTML = `${esc(l.name)}<small>${esc(l.area || "Leonida")}</small>`;
     for (const k of ["ig", "rl"]) {
-      const fig = cmp.querySelector(k === "ig" ? ".cig" : ".crl");
-      fig.hidden = !l.photos.includes(k);
-      fig.querySelector("img").src = l.photos.includes(k) ? photoUrl(l.id, k) : "";
+      const fig = cmp.querySelector(k === "ig" ? ".cig" : ".crl"), has = l.photos.includes(k), s = l.size[k];
+      fig.hidden = !has;
+      fig.querySelector("img").src = has ? photoUrl(l.id, k) : "";
+      fig.querySelector("figcaption").innerHTML = `${k === "ig" ? "IN-GAME" : "REAL LIFE"}${s ? ` <span class="res">${s[0]}×${s[1]}</span>` : ""}`;
     }
     cmp.querySelector(".seg").hidden = !both;
-    setCompareMode(both ? mode : "side");
     cbody.classList.toggle("single", !both);
+    setCompareMode(both ? mode : "side");
+    setSliderPos(50);
     cmp.querySelector(".cfoot").innerHTML =
       `<b style="color:var(--pink)">In-game:</b> ${esc(l.ig || "?")} &nbsp;·&nbsp; <b style="color:#7dd3fc">Real life:</b> ${esc(l.rl || "Unknown")}
-       <br>Photos: gtadb.org contributors, CC BY 4.0`;
+       <br>Photos: gtadb.org contributors, CC BY 4.0. Shown at up to 1.5× their original size.`;
     cmp.hidden = false;
+    layoutCompare();
   }
+  window.addEventListener("resize", layoutCompare);
   function setCompareMode(mode) {
     cbody.className = `cbody ${mode}${cbody.classList.contains("single") ? " single" : ""}`;
     cmp.querySelectorAll("[data-mode]").forEach(b => b.classList.toggle("on", b.dataset.mode === mode));
   }
   cmp.querySelector(".seg").onclick = e => { const m = e.target.dataset.mode; if (m) setCompareMode(m); };
-  cmp.querySelector(".cslider").oninput = e => cbody.style.setProperty("--pos", e.target.value + "%");
+  cmp.querySelector(".cslider").oninput = e => setSliderPos(e.target.value);
   cmp.querySelector(".cclose").onclick = () => cmp.hidden = true;
   cbody.addEventListener("click", e => { if (cbody.classList.contains("side") && e.target === cbody) cmp.hidden = true; });
 
@@ -641,6 +676,7 @@
   applyFilters();
   $("#loading").hidden = true;
   if (hid && find(hid)) select(hid);
+  if (version?.date) $("#dataDate").textContent = ` Landmark data updated ${ago(version.date)}.`;
 
   async function loadCommunity() {
     if (!sb) return;
