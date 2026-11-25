@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Leonida: interactive GTA VI map</title>
+<meta name="description" content="Interactive GTA VI map with 4,000+ landmarks, real-life comparisons and community pins.">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<aside id="sidebar">
+  <header class="brand">
+    <div>
+      <h1>LEONIDA</h1>
+      <p>Interactive GTA VI map</p>
+    </div>
+    <div class="stat"><b id="statShown">0</b><span>on map</span></div>
+  </header>
+
+  <div class="search">
+    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="m20 20-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <input id="search" type="search" placeholder="Search places, streets, real addresses…" autocomplete="off">
+    <kbd>/</kbd>
+    <ul id="results" hidden></ul>
+  </div>
+
+  <div class="toolbar">
+    <button data-bulk="all">Show all</button>
+    <button data-bulk="none">Hide all</button>
+    <button data-bulk="reset">Reset</button>
+    <button id="collapseAll">Collapse groups</button>
+  </div>
+
+  <div id="filters"></div>
+
+  <footer class="credit">
+    Map tiles, photos &amp; landmark data: <a href="https://map.gtadb.org" target="_blank" rel="noopener">gtadb.org</a> and contributors
+    (<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>), recategorized.
+    Unofficial fan project, not affiliated with Rockstar Games.
+  </footer>
+</aside>
+
+<main>
+  <div id="map"></div>
+
+  <button id="toggleSidebar" class="float tl" title="Hide sidebar">‹</button>
+
+  <div class="float tr">
+    <button id="addPin" class="pink">＋ Add pin</button>
+    <button id="fullscreen">⤢ Fullscreen</button>
+  </div>
+
+  <div class="float bl" id="shortcuts">
+    <button class="shead">Shortcuts <span>⌄</span></button>
+    <div class="sbody">
+      <div><kbd>F</kbd> Fullscreen</div>
+      <div><kbd>/</kbd> Search</div>
+      <div><kbd>P</kbd> Add pin</div>
+      <div><kbd>C</kbd> Compare photos</div>
+      <div><kbd>Right-click</kbd> Pin here</div>
+      <div><kbd>Esc</kbd> Close</div>
+    </div>
+  </div>
+
+  <form class="float br" id="goto">
+    <span id="cursor">—</span>
+    <b>X / Y</b>
+    <input id="gx" placeholder="X" inputmode="numeric">
+    <input id="gy" placeholder="Y" inputmode="numeric">
+    <button title="Go to coordinates">Go</button>
+  </form>
+
+  <div id="panel" hidden></div>
+  <div id="toast" hidden></div>
+  <div id="loading">Loading Leonida…</div>
+</main>
+
+<div id="compare" hidden>
+  <div class="cbar">
+    <div class="ctitle"></div>
+    <div class="seg">
+      <button data-mode="side" class="on">Side by side</button>
+      <button data-mode="slider">Slider</button>
+    </div>
+    <button class="cclose" aria-label="Close">×</button>
+  </div>
+  <div class="cbody side">
+    <figure class="cig"><img alt=""><figcaption>IN-GAME</figcaption></figure>
+    <figure class="crl"><img alt=""><figcaption>REAL LIFE</figcaption></figure>
+    <input class="cslider" type="range" min="0" max="100" value="50" aria-label="Reveal">
+    <div class="cline"></div>
+  </div>
+  <div class="cfoot"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="config.js"></script>
+<script src="icons.js"></script>
+<script src="categories.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
