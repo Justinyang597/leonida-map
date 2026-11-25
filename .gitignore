@@ -1,2 +1,4 @@
 # Local copy of gtadb tiles/photos/data (fetched by the deploy workflow instead)
 vendor/
+# Local Claude/Supabase MCP setup
+.mcp.json

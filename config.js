@@ -2,6 +2,6 @@
 // the anon key can only do what supabase/schema.sql allows.
 // Leave empty to run without community pins.
 window.CONFIG = {
-  supabaseUrl: "",      // e.g. "https://abcdefghijkl.supabase.co"
-  supabaseAnonKey: "",  // Project Settings → API → anon public key
+  supabaseUrl: "https://igwzuhekfgypnqrlgrdt.supabase.co",
+  supabaseAnonKey: "sb_publishable_tDepkHEwP-8bCfVjLBa3VQ_Mcov5Tt0", // publishable key: meant to be public
 };
