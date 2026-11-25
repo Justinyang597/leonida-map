@@ -337,9 +337,9 @@
     }).join("") : `<li class="empty">No matches</li>`;
     results.hidden = false;
   }
-  const pick = i => { const h = hits[i]; if (!h) return; results.hidden = true; $("#search").blur(); focusOn(h.id); };
+  const pick = i => { const h = hits[i]; if (!h) return; results.hidden = true; $("#search").blur(); setSheet(false); focusOn(h.id); };
   $("#search").addEventListener("input", runSearch);
-  $("#search").addEventListener("focus", runSearch);
+  $("#search").addEventListener("focus", () => { if (isMobile()) setSheet(true); runSearch(); });
   $("#search").addEventListener("keydown", e => {
     if (e.key === "Enter") pick(hi);
     else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
@@ -384,6 +384,17 @@
   const panel = $("#panel");
   const ring = L.marker([0, 0], { interactive: false, icon: L.divIcon({ className: "", iconSize: [48, 48], html: '<div class="sel-ring"></div>' }) });
 
+  const isMobile = () => matchMedia("(max-width: 760px)").matches;
+  const showPanel = () => { panel.hidden = false; document.body.classList.add("panel-open"); setSheet(false); panel.scrollTop = 0; };
+  // On phones the panel covers the lower part of the screen, so park the target in the top third.
+  function flyToVisible(latlng) {
+    const z = Math.max(map.getZoom(), 5);
+    const target = isMobile()
+      ? map.unproject(map.project(latlng, z).add([0, map.getSize().y * 0.3]), z)
+      : latlng;
+    map.flyTo(target, z, { duration: 0.8 });
+  }
+
   function focusOn(id) {
     const t = find(id); if (!t) return;
     if (t.type === "lm" && !lmVisible(t)) {
@@ -392,10 +403,10 @@
     }
     if (t.type === "cm" && !cmVisible(t)) { state.layers.community = true; state.hiddenKinds.delete(t.kind); applyFilters(); }
     if (t.type === "mine" && !state.layers.mine) { state.layers.mine = true; applyFilters(); }
-    map.flyTo(ll(t.x, t.y), Math.max(map.getZoom(), 5), { duration: 0.8 });
+    flyToVisible(ll(t.x, t.y));
     select(id);
   }
-  function closePanel() { panel.hidden = true; state.selected = null; ring.remove(); updateHash(); }
+  function closePanel() { panel.hidden = true; document.body.classList.remove("panel-open"); state.selected = null; ring.remove(); updateHash(); }
 
   const head = (color, ic, label, title) => `
     <div class="phead"><span class="badge" style="--c:${color}">${icon(ic)}</span>
@@ -406,7 +417,7 @@
     const t = find(id); if (!t) return;
     state.selected = id;
     ring.setLatLng(ll(t.x, t.y)).addTo(map);
-    panel.hidden = false;
+    showPanel();
 
     if (t.type === "lm") {
       const c = catById[t.cat];
@@ -510,7 +521,7 @@
   function pinForm(p) {
     const editing = !!p.id;
     let vis = "me", kind = "collectible";
-    panel.hidden = false;
+    showPanel();
     panel.innerHTML = `
       <button class="close" aria-label="Close">×</button>
       <div class="pbody">
@@ -562,7 +573,7 @@
     panel.querySelector(".close").onclick = closePanel;
   }
   const newPinAt = latlng => { setPlacing(false); const [x, y] = xy(latlng); ring.setLatLng(latlng).addTo(map); pinForm({ x, y, name: "", note: "" }); };
-  map.on("click", e => { if (placing) newPinAt(e.latlng); });
+  map.on("click", e => { if (placing) newPinAt(e.latlng); else setSheet(false); });
   map.on("contextmenu", e => newPinAt(e.latlng));
 
   // ---------- coordinates ----------
@@ -574,7 +585,7 @@
     if (isNaN(y) && both?.length === 2) [x, y] = both.map(Number);
     if (isNaN(x) || isNaN(y)) return toast("Enter an X and a Y coordinate.", true);
     ring.setLatLng(ll(x, y)).addTo(map);
-    map.flyTo(ll(x, y), Math.max(map.getZoom(), 5), { duration: 0.8 });
+    flyToVisible(ll(x, y));
   });
 
   // ---------- URL hash ----------
@@ -583,6 +594,21 @@
     history.replaceState(null, "", `#${Math.round(c.lng)},${Math.round(c.lat)},${map.getZoom()}${state.selected ? "," + state.selected : ""}`);
   }
   map.on("moveend", updateHash);
+
+  // ---------- phone bottom sheet ----------
+  function setSheet(open) { document.body.classList.toggle("sheet-open", open && isMobile()); }
+  const handle = $("#sheetHandle");
+  handle.onclick = () => setSheet(!document.body.classList.contains("sheet-open"));
+  // swipe up/down on the handle or header to open/close
+  let swipeY = null;
+  for (const el of [handle, $(".brand")]) {
+    el.addEventListener("pointerdown", e => { swipeY = e.clientY; });
+    el.addEventListener("pointerup", e => {
+      if (swipeY === null) return;
+      const dy = e.clientY - swipeY; swipeY = null;
+      if (Math.abs(dy) > 30) setSheet(dy < 0);
+    });
+  }
 
   // ---------- chrome ----------
   $("#toggleSidebar").onclick = () => {

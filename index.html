@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0e1016">
 <title>Leonida: interactive GTA VI map</title>
 <meta name="description" content="Interactive GTA VI map with 4,000+ landmarks, real-life comparisons and community pins.">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -10,6 +11,7 @@
 </head>
 <body>
 <aside id="sidebar">
+  <button id="sheetHandle" aria-label="Show filters"><span></span></button>
   <header class="brand">
     <div>
       <h1>LEONIDA</h1>
@@ -47,8 +49,8 @@
   <button id="toggleSidebar" class="float tl" title="Hide sidebar">‹</button>
 
   <div class="float tr">
-    <button id="addPin" class="pink">＋ Add pin</button>
-    <button id="fullscreen">⤢ Fullscreen</button>
+    <button id="addPin" class="pink" title="Add pin">＋<span class="txt"> Add pin</span></button>
+    <button id="fullscreen" title="Fullscreen">⤢<span class="txt"> Fullscreen</span></button>
   </div>
 
   <div class="float bl" id="shortcuts">
